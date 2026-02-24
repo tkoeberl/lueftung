@@ -216,3 +216,4 @@ Control elements:
 - Designed for decentralized ventilation units
 - Optimized for quiet, balanced, and energy-efficient operation
 - each vent can be conrolled by homeassistant directly to extend the programs
+- no guarantee of any kind. 
