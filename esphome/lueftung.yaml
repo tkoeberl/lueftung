@@ -1,0 +1,584 @@
+esphome:
+  name: "luefter"
+  friendly_name: luefter
+  min_version: 2025.11.0
+  name_add_mac_suffix: false
+
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+    advanced:
+      minimum_chip_revision: "3.1"
+
+
+wifi:
+  #ssid: !secret wifi_ssid
+  #password: !secret wifi_password
+  # Enable fallback AP if WiFi fails
+  ap:
+    ssid: "Windfried"
+    # password: "optional_password"
+captive_portal:
+
+web_server:
+  port: 80
+
+mdns:
+  disabled: false
+
+logger:
+  logs: 
+    component: WARN
+  level: WARN
+
+api:
+    services:
+    - action: set_luefter_level
+      variables:
+        luefter: int
+        level: float
+      then:
+        - script.execute:
+            id: set_luefter_level
+            luefter: !lambda 'return luefter;'
+            level: !lambda 'return level;'
+
+ota:
+  platform: esphome
+
+globals:
+  - id: current_program
+    type: std::string
+    restore_value: true 
+  - id: last_program
+    type: std::string
+    restore_value: true    
+  - id: current_level
+    type: int
+    restore_value: true
+  - id: last_level
+    type: int
+    restore_value: true    
+  - id: current_percentage
+    type: float
+    restore_value: false  # Kein Wert wird beim Neustart wiederhergestellt
+    initial_value: '0'
+  - id: current_interval
+    type: int
+    restore_value: false  # Kein Wert wird beim Neustart wiederhergestellt
+    initial_value: '0'  
+  - id: mode_index
+    type: int
+    initial_value: '0'    
+  - id: current_luefter_1_pwm
+    type: float
+    restore_value: false  # Kein Wert wird beim Neustart wiederhergestellt
+    initial_value: '0'
+  - id: current_luefter_2_pwm
+    type: float
+    restore_value: false  # Kein Wert wird beim Neustart wiederhergestellt
+    initial_value: '0'
+  - id: current_luefter_3_pwm
+    type: float
+    restore_value: false  # Kein Wert wird beim Neustart wiederhergestellt
+    initial_value: '0'        
+  - id: current_luefter_4_pwm
+    type: float
+    restore_value: false  # Kein Wert wird beim Neustart wiederhergestellt
+    initial_value: '0' 
+  - id: betrieb_seconds
+    type: uint32_t
+    restore_value: true
+    initial_value: '0'    
+  - id: filter_limit_hours
+    type: float
+    restore_value: false
+    initial_value: '4000.0'    
+
+# Definiere die PWM-Ausgänge für die Lüfter
+output:
+  - platform: ledc
+    id: luefter_1_pwm
+    pin: GPIO25
+    frequency: 2000Hz 
+    inverted: false
+  - platform: ledc
+    id: luefter_2_pwm
+    pin: GPIO26
+    frequency: 2000Hz 
+    inverted: false
+  - platform: ledc
+    id: luefter_3_pwm
+    pin: GPIO32
+    frequency: 2000Hz 
+    inverted: false    
+  - platform: ledc
+    id: luefter_4_pwm
+    pin: GPIO33
+    frequency: 2000Hz 
+    inverted: false
+
+button:
+  - platform: template
+    name: "reboot"
+    on_press:
+      - logger.log: "Manual reboot"
+      - delay: 300ms
+      - lambda: |-      
+          ESP_LOGI("reboot", "current_program: %s , current_level: %d", id(current_program).c_str(), id(current_level) );
+      - button.press: reboot_button
+  - platform: restart
+    id: reboot_button
+    internal: true  # Dieser Button wird nicht in Home Assistant angezeigt
+  - platform: template
+    name: "Betriebsstunden zurücksetzen"
+    icon: "mdi:restart"
+    on_press:
+      - lambda: |-
+          id(betrieb_seconds) = 0;  
+          id(script_update).execute();
+
+select:
+  - platform: template
+    name: "Lüfterprogramm"
+    id: program_select
+    options:
+      - "cross_1"
+      - "cross_2"
+      - "efficient"
+      - "intensive"
+#    optimistic: true
+#    restore_value: true
+    set_action:
+      - logger.log:
+          format: "Ausgewähltes Programm: %s.c_str()"
+          args: ['x']
+      - lambda: |-
+          // wir wandeln x in einen int-Code um
+          if (x == "cross_1") {
+            id(last_program) = id(current_program);
+            id(current_program)="cross_1";
+            id(program_select).publish_state("cross_1");
+            id(script_update).execute();
+          }
+          else if (x == "cross_2") {
+            id(last_program) = id(current_program);
+            id(current_program)="cross_2";
+            id(program_select).publish_state("cross_2");
+            id(script_update).execute();
+          }
+          else if (x == "efficient"){
+            id(last_program) = id(current_program);          
+            id(current_program)="efficient";
+            id(program_select).publish_state("efficient");
+            id(script_update).execute();
+          }
+          else if (x == "intensive"){
+            id(last_program) = id(current_program);
+            id(current_program)="intensive";
+            id(program_select).publish_state("intensive");
+            id(script_update).execute();
+          }
+          else{
+            ESP_LOGW("luefter", "Unbekanntes Programm: %s", x.c_str());
+          }
+
+number:
+  - platform: template
+    id: luefter_level
+    name: "Lüfter-Level"
+    min_value: 0
+    max_value: 5
+    step: 1
+    mode: slider
+    restore_value: true
+    set_action:
+      - lambda: |-
+          int level = (int)x;
+          ESP_LOGI("luefter", "Neues Level: %d", level);
+          id(last_level) = id(current_level);
+          id(luefter_level).publish_state(level);
+          id(current_level)=level;
+          id(script_update).execute();
+interval:
+  - interval: 60s
+    then:
+      - lambda: |-
+          if (id(current_level) > 0) {
+            id(betrieb_seconds) += 60;
+          }
+  - interval: 3600s
+    then:
+      - lambda: |-
+          if (id(current_level) > 0) {
+            id(betrieb_seconds) += 60;
+          }
+
+          bool filter_needed = (id(betrieb_seconds) / 3600.0) >= id(filter_limit_hours);
+          id(filter_change_required).publish_state(filter_needed);          
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO34
+      mode: INPUT
+      inverted: true
+    name: "binary_program"
+    id: binary_program
+    internal: true
+    filters:
+      - delayed_on: 10ms  # Entprellung
+    on_press:
+      then:
+        - lambda: |-
+            id(mode_index) += 1;
+            if (id(mode_index) > 4) id(mode_index) = 0;
+
+            switch (id(mode_index)) {
+              case 0:
+                id(last_program) = id(current_program);
+                id(program_select).publish_state("cross_1");
+                id(current_program)="cross_1";
+                break;
+              case 1:
+                id(last_program) = id(current_program);
+                id(program_select).publish_state("cross_2");
+                id(current_program)="cross_2";
+                break;
+              case 2:
+                id(last_program) = id(current_program);
+                id(program_select).publish_state("efficient");
+                id(current_program)="efficient";
+                break;
+              case 3:
+                id(last_program) = id(current_program);
+                id(program_select).publish_state("intensive");
+                id(current_program)="intensive";
+                break;
+            }
+            id(script_update).execute();
+  - platform: template
+    name: "Filterwechsel erforderlich"
+    id: filter_change_required
+    device_class: problem
+    icon: "mdi:air-filter"
+    lambda: |-
+      return (id(betrieb_seconds) / 3600.0) >= id(filter_limit_hours);
+          
+
+  - platform: gpio
+    pin:
+      number: GPIO35
+      mode: INPUT
+      inverted: false
+    name: "binary_level"
+    id: binary_level
+    internal: true
+    filters:
+      - delayed_on: 10ms  
+    on_press:
+      then:
+        - lambda: |-
+            id(last_level) = id(current_level);
+            id(current_level) += 1;
+            if (id(current_level) > 5) id(current_level) = 0;
+            id(luefter_level).publish_state(id(current_level));
+            id(script_update).execute();
+
+spi: 
+  clk_pin: GPIO14 #scl green
+  mosi_pin: GPIO27 # sda yellow
+
+display: 
+  - platform: waveshare_epaper
+    model: 2.90inV2
+    id: epaper_display
+    cs_pin: GPIO23 #blue
+    dc_pin: GPIO22 # white was22
+    reset_pin: GPIO21 #orange
+    busy_pin: GPIO4 #purple
+    rotation: 90°
+    full_update_every: 1
+    update_interval: 24h
+    lambda: |-
+      it.fill(COLOR_OFF);
+      ESP_LOGD("epaper_display", "updating epaper_display: programm: %s", id(current_program).c_str());
+
+      it.image(45, 0, id(ventman_icon)); 
+
+      int luefter_lvl = id(luefter_level).state;
+      switch (luefter_lvl) {
+        case 0: it.image(45, 64, id(fan_level_0_icon)); break;
+        case 1: it.image(45, 64, id(fan_level_1_icon)); break;
+        case 2: it.image(45, 64, id(fan_level_2_icon)); break;
+        case 3: it.image(45, 64, id(fan_level_3_icon)); break;
+        case 4: it.image(45, 64, id(fan_level_4_icon)); break;
+        case 5: it.image(45, 64, id(fan_level_5_icon)); break;
+      }
+
+      if (id(current_program) == "cross_1") {
+        it.print(62, 13, id(font_med), "Quer vorwärts");
+      } else if (id(current_program) == "cross_2") {
+        it.print(58, 13, id(font_med), "Quer rückwärts");
+      } else if (id(current_program) == "efficient") {
+        it.print(90, 13, id(font_med), "Effizient");
+      } else if (id(current_program) == "intensive") {
+        it.print(75, 13, id(font_med), "Stoßlüftung");
+      }
+
+      float used_hours = id(betrieb_seconds) / 3600.0;
+      float remaining_hours = id(filter_limit_hours) - used_hours;
+
+      if (remaining_hours > 0) {
+        it.printf(3, 119, id(font_mini), "Filterwechsel in: %.0f Tagen", remaining_hours/24);  
+      } else {
+        it.print(3, 119, id(font_mini), "FILTER WECHSELN!");
+      }
+
+   
+
+font:
+  - file: "fonts/B612-Regular.ttf"
+    id: font_big
+    size: 24
+    glyphs:
+      ['ß', '&', '@', '!', ',', '.', '?', '"', '%', '(', ')', '+', '-', '_', ':', '°', '0',
+       '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E',
+       'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S',
+       'T', 'U', 'V', 'W', 'X', 'Y', 'Z', ' ', 'a', 'b', 'c', 'd', 'e', 'f',
+       'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
+       'u', 'v', 'w', 'x', 'y', 'z','å', 'Ä', 'ä', 'Ö', 'ö', 'Ü', 'ü', '/'] 
+  - file: "fonts/B612-Regular.ttf"
+    id: font_med
+    size: 18
+    glyphs:
+      ['ß','&', '@', '!', ',', '.', '?', '"', '%', '(', ')', '+', '-', '_', ':', '°', '0',
+       '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E',
+       'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S',
+       'T', 'U', 'V', 'W', 'X', 'Y', 'Z', ' ', 'a', 'b', 'c', 'd', 'e', 'f',
+       'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
+       'u', 'v', 'w', 'x', 'y', 'z','å', 'Ä', 'ä', 'Ö', 'ö', 'Ü', 'ü', '/'] 
+  - file: "fonts/B612-Regular.ttf"
+    id: font_sma
+    size: 14
+    glyphs:
+      ['ß','&', '@', '!', ',', '.', '?', '"', '%', '(', ')', '+', '-', '_', ':', '°', '0',
+       '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E',
+       'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S',
+       'T', 'U', 'V', 'W', 'X', 'Y', 'Z', ' ', 'a', 'b', 'c', 'd', 'e', 'f',
+       'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
+       'u', 'v', 'w', 'x', 'y', 'z','å', 'Ä', 'ä', 'Ö', 'ö', 'Ü', 'ü', '/'] 
+  - file: "fonts/B612-Regular.ttf"
+    id: font_mini
+    size: 8
+    glyphs:
+      ['ß','&', '@', '!', ',', '.', '?', '"', '%', '(', ')', '+', '-', '_', ':', '°', '0',
+       '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E',
+       'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S',
+       'T', 'U', 'V', 'W', 'X', 'Y', 'Z', ' ', 'a', 'b', 'c', 'd', 'e', 'f',
+       'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
+       'u', 'v', 'w', 'x', 'y', 'z','å', 'Ä', 'ä', 'Ö', 'ö', 'Ü', 'ü', '/']
+image:
+  - file: "fan_level_0.xbm"
+    id: fan_level_0_icon
+    type: BINARY
+    resize: 64x64
+  - file: "fan_level_1.xbm"
+    id: fan_level_1_icon
+    type: BINARY
+    resize: 64x64
+  - file: "fan_level_2.xbm"
+    id: fan_level_2_icon
+    type: BINARY
+    resize: 64x64
+  - file: "fan_level_3.xbm"
+    id: fan_level_3_icon
+    type: BINARY
+    resize: 64x64
+  - file: "fan_level_4.xbm"
+    id: fan_level_4_icon
+    type: BINARY
+    resize: 64x64
+  - file: "fan_level_5.xbm"
+    id: fan_level_5_icon
+    type: BINARY
+    resize: 64x64                    
+  - file: "ventman.xbm"
+    id: ventman_icon
+    type: BINARY
+    resize: 221x128
+   
+# Drehzahlsteuerung der Lüfter
+script:
+  - id: script_intensive
+    mode: restart
+    then:
+    - script.stop: script_cross
+    - script.stop: script_efficient
+    - lambda: |-
+        ESP_LOGD("script_intensive", "call script_efficient");
+    - script.execute: script_efficient
+    - delay: 900s  
+    - lambda: |-
+        ESP_LOGD("script_intensive", "stop script_efficient");    
+    - script.stop: script_efficient  
+    - delay: 6300s
+    - lambda: |-
+        ESP_LOGD("script_intensive", "call script_intensive recursive.");
+        id(script_intensive).execute();
+
+  - id: script_efficient
+    mode: restart 
+    then:
+    - script.stop: script_cross
+    - lambda: |-
+        ESP_LOGD("script_efficient", "Starte efficient-Drehung mit Level: %d", id(current_level));
+        float perc=id(current_percentage);
+        ESP_LOGI("script_efficient", "Using percentage: %0.3f",perc);
+        
+        for (int fan = 1; fan <= 4; fan++) {
+          float level = (fan % 2 == 1) ? (1.0f - perc) : perc;
+          id(set_luefter_level).execute(fan, level);
+        }
+
+    - delay: !lambda 'return id(current_interval);'  
+    - lambda: |-
+        ESP_LOGD("script_efficient", "Starte efficient-Drehung mit Level: %d", id(current_level));
+        float perc=id(current_percentage);
+        for (int fan = 1; fan <= 4; fan++) {
+          float level = (fan % 2 == 1) ? perc : (1.0f - perc);
+          id(set_luefter_level).execute(fan, level);
+        }        
+    - delay: !lambda 'return id(current_interval);'    
+    - lambda: |-
+        id(script_efficient).execute();        
+
+  - id: script_cross
+    then:
+      - script.stop: script_efficient
+      - script.stop: script_intensive
+      - lambda: |-
+          std::string programm = id(current_program) ;
+          ESP_LOGD("cross_script", "Starte cross-Drehung mit percentage: %f; dir: %s", id(current_percentage), programm.c_str());
+          float perc = id(current_percentage);
+          float level=0;
+          if (programm=="cross_1") {
+            ESP_LOGD("cross_script", "Starte cross-Drehung mit dir: %d", level);
+            id(set_luefter_level).execute(1, 1.0f - perc);
+            id(set_luefter_level).execute(2, perc);
+            id(set_luefter_level).execute(3, 1.0f - perc);
+            id(set_luefter_level).execute(4, perc);
+            //level = (fan <= 4) ? perc : (1.0f - perc);
+          }
+          else{
+            id(set_luefter_level).execute(1, perc);
+            id(set_luefter_level).execute(2, 1.0f - perc);
+            id(set_luefter_level).execute(3, perc);
+            id(set_luefter_level).execute(4, 1.0f - perc);
+          }
+
+  - id: script_update
+    then:
+      - script.stop: script_cross
+      - script.stop: script_efficient
+      - script.stop: script_intensive
+      - lambda: |-
+          ESP_LOGI("script_update", "current_program: %s , current_level:%d", id(current_program).c_str(), id(current_level) );
+
+          int intervals[6] = {99999999, 70000, 65000, 60000, 55000, 50000};
+          id(current_interval) = intervals[id(current_level)];
+          
+          float perc[6] = {0.5f, 0.4f, 0.3f, 0.2f, 0.1f, 0.01f};
+          id(current_percentage) = perc[id(current_level)];
+          
+          if (id(current_level) > 0 && id(current_level) <= 5) {
+            id(current_percentage) = perc[id(current_level)];
+          } else if(id(current_level) == 0){
+            id(current_percentage)=0.5f;
+          } else {
+            ESP_LOGW("lueftersteuerung", "Ungültiges level: %d (nur 1–5 erlaubt)", id(current_level));
+            //Setze Lüfter auf die korrekten Level
+            id(current_percentage) = 0;
+            for (int fan = 1; fan <= 3; fan++) {
+              id(set_luefter_level).execute(fan, id(current_percentage));
+            }
+            return;
+          }
+          
+          if (id(current_program) == "cross_1" || id(current_program) == "cross_2"){
+            id(script_cross).execute();
+          } else if (id(current_program) == "efficient") {
+            id(script_efficient).execute();
+          } else if (id(current_program) == "intensive") {
+            id(script_intensive).execute();                        
+          } else {
+            ESP_LOGW("script_update", "Unbekanntes Programm: %s", id(current_program).c_str());
+          }
+      - delay: 200ms
+      - component.update: epaper_display
+
+  - id: set_luefter_level
+    parameters:
+      luefter: int
+      level: float 
+    then:
+      - lambda: |-
+          ESP_LOGD("lueftersteuerung", "Setze Lüfter %d auf PWM-Level: %0.3f", luefter, level);
+          switch (luefter) {
+            case 1:
+              id(luefter_1_pwm).set_level(level);
+              id(current_luefter_1_pwm) = level;
+              id(sensor_luefter_1_perc).publish_state(level * 100.0);
+              break;
+            case 2:
+              id(luefter_2_pwm).set_level(level);
+              id(current_luefter_2_pwm) = level;
+              id(sensor_luefter_2_perc).publish_state(level * 100.0);
+              break;
+            case 3:
+              id(luefter_3_pwm).set_level(level);
+              id(current_luefter_3_pwm) = level;
+              id(sensor_luefter_3_perc).publish_state(level * 100.0);
+              break;    
+            case 4:
+              id(luefter_4_pwm).set_level(level);
+              id(current_luefter_4_pwm) = level;
+              id(sensor_luefter_4_perc).publish_state(level * 100.0);
+              break;                                                            
+            default:
+              ESP_LOGW("lueftersteuerung", "Ungültige Lüfternummer: %d", luefter);
+              break;
+          }
+sensor:        
+  - platform: template
+    name: "Lüfter 1"
+    id: sensor_luefter_1_perc
+    unit_of_measurement: "%"
+    accuracy_decimals: 3
+  - platform: template
+    name: "Lüfter 2"
+    id: sensor_luefter_2_perc
+    unit_of_measurement: "%"
+    accuracy_decimals: 3
+  - platform: template
+    name: "Lüfter 3"
+    id: sensor_luefter_3_perc
+    unit_of_measurement: "%"
+    accuracy_decimals: 3
+  - platform: template
+    name: "Lüfter 4"
+    id: sensor_luefter_4_perc
+    unit_of_measurement: "%"
+    accuracy_decimals: 4    
+  - platform: template
+    name: "Ventilator Betriebsstunden"
+    id: betrieb_hours
+    unit_of_measurement: "h"
+    accuracy_decimals: 1
+    icon: "mdi:timer-outline"
+    lambda: |-
+      return id(betrieb_seconds) / 3600.0;
+    update_interval: 60s       
+
