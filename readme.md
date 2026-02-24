@@ -10,11 +10,11 @@ This controller operates decentralized ventilation systems (e.g. Ventomaxx) usin
 
 ## 🔧 Hardware
 
-- PCB: `fritzing/lueftung.fzz`
-- ESP32  
-- 2.9" e-paper display  
-- Voltage regulator  
-- Level shifter  
+- PCB: (fritzing/lueftung.fzz)
+- ESP32 (https://de.aliexpress.com/item/1005008010626661.html?spm=a2g0o.order_list.order_list_main.89.3eb85c5fi5msiT&gatewayAdapt=glo2deu)
+- 2.9" e-paper display (https://de.aliexpress.com/item/1005004644515880.html?spm=a2g0o.order_list.order_list_main.47.3eb85c5fi5msiT&gatewayAdapt=glo2deu)
+- Voltage regulator (https://de.aliexpress.com/item/1005006786970258.html?spm=a2g0o.order_list.order_list_main.35.3eb85c5fi5msiT&gatewayAdapt=glo2deu)
+- Level shifter (https://www.amazon.de/dp/B082F6BSB5?ref_=ppx_hzsearch_conn_dt_b_fed_asin_title_1)
 - Misc. small components  
 
 ---
