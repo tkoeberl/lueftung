@@ -1,8 +1,21 @@
 esphome:
-  name: "luefter"
-  friendly_name: luefter
+  name: "lueftereg"
+  friendly_name: lueftereg
   min_version: 2025.11.0
   name_add_mac_suffix: false
+  on_boot:
+    priority: -100
+    then:
+      - lambda: |-
+          if (id(current_program).empty())
+            id(current_program) = "cross_1";
+
+          if (id(current_level) < 0 || id(current_level) > 5)
+            id(current_level) = 0;  
+      - lambda: |-
+          id(program_select).publish_state(id(current_program));
+          id(luefter_level).publish_state(id(current_level));
+      - script.execute: script_update
 
 
 esp32:
@@ -20,6 +33,7 @@ wifi:
   ap:
     ssid: "Windfried"
     # password: "optional_password"
+
 captive_portal:
 
 web_server:
@@ -51,7 +65,7 @@ ota:
 globals:
   - id: current_program
     type: std::string
-    restore_value: true 
+    restore_value: true
   - id: last_program
     type: std::string
     restore_value: true    
@@ -149,8 +163,8 @@ select:
       - "cross_2"
       - "efficient"
       - "intensive"
-#    optimistic: true
-#    restore_value: true
+    optimistic: true
+    restore_value: true
     set_action:
       - logger.log:
           format: "Ausgewähltes Programm: %s.c_str()"
@@ -213,7 +227,7 @@ interval:
     then:
       - lambda: |-
           if (id(current_level) > 0) {
-            id(betrieb_seconds) += 60;
+            id(betrieb_seconds) += 3600;
           }
 
           bool filter_needed = (id(betrieb_seconds) / 3600.0) >= id(filter_limit_hours);
