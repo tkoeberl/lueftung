@@ -2,8 +2,8 @@
 
 This controller operates decentralized ventilation systems (e.g. Ventomaxx) using an ESP32 and ESPHome.
 
-<img src="https://github.com/tkoeberl/lueftung/blob/main/img/front.png" alt="front" width="200"/>  
-<img src="https://github.com/tkoeberl/lueftung/blob/main/img/platine.png" alt="platine" width="200"/>
+<img src="img/front.png" alt="front" width="200"/>  
+<img src="img/platine.png" alt="platine" width="200"/>
 
 
 ---
