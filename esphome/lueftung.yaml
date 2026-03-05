@@ -345,13 +345,15 @@ display:
       }
 
       if (id(current_program) == "cross_1") {
-        it.print(62, 13, id(font_med), "Quer vorwärts");
-      } else if (id(current_program) == "-> Quer ->") {
-        it.print(58, 13, id(font_med), "<- Quer <-");
+        it.print(90, 13, id(font_med), "Quer ->");
+      } else if (id(current_program) == "cross_2") {
+        it.print(90, 13, id(font_med), "Quer <-");
       } else if (id(current_program) == "efficient") {
         it.print(90, 13, id(font_med), "Intervall");
       } else if (id(current_program) == "intensive") {
         it.print(75, 13, id(font_med), "Stoßlüftung");
+      } else if (id(current_program) == "off") {
+        it.print(105, 13, id(font_med), "Aus");
       }
 
       float used_hours = id(betrieb_seconds) / 3600.0;
@@ -362,7 +364,6 @@ display:
       } else {
         it.print(3, 119, id(font_mini), "FILTER WECHSELN!");
       }
-
    
 
 font:
@@ -375,7 +376,7 @@ font:
        'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S',
        'T', 'U', 'V', 'W', 'X', 'Y', 'Z', ' ', 'a', 'b', 'c', 'd', 'e', 'f',
        'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
-       'u', 'v', 'w', 'x', 'y', 'z','å', 'Ä', 'ä', 'Ö', 'ö', 'Ü', 'ü', '/'] 
+       'u', 'v', 'w', 'x', 'y', 'z','å', 'Ä', 'ä', 'Ö', 'ö', 'Ü', 'ü', '/','<','>'] 
   - file: "fonts/B612-Regular.ttf"
     id: font_med
     size: 18
@@ -385,7 +386,7 @@ font:
        'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S',
        'T', 'U', 'V', 'W', 'X', 'Y', 'Z', ' ', 'a', 'b', 'c', 'd', 'e', 'f',
        'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
-       'u', 'v', 'w', 'x', 'y', 'z','å', 'Ä', 'ä', 'Ö', 'ö', 'Ü', 'ü', '/'] 
+       'u', 'v', 'w', 'x', 'y', 'z','å', 'Ä', 'ä', 'Ö', 'ö', 'Ü', 'ü', '/','<','>'] 
   - file: "fonts/B612-Regular.ttf"
     id: font_sma
     size: 14
@@ -395,7 +396,7 @@ font:
        'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S',
        'T', 'U', 'V', 'W', 'X', 'Y', 'Z', ' ', 'a', 'b', 'c', 'd', 'e', 'f',
        'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
-       'u', 'v', 'w', 'x', 'y', 'z','å', 'Ä', 'ä', 'Ö', 'ö', 'Ü', 'ü', '/'] 
+       'u', 'v', 'w', 'x', 'y', 'z','å', 'Ä', 'ä', 'Ö', 'ö', 'Ü', 'ü', '/','<','>'] 
   - file: "fonts/B612-Regular.ttf"
     id: font_mini
     size: 8
@@ -405,7 +406,7 @@ font:
        'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S',
        'T', 'U', 'V', 'W', 'X', 'Y', 'Z', ' ', 'a', 'b', 'c', 'd', 'e', 'f',
        'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
-       'u', 'v', 'w', 'x', 'y', 'z','å', 'Ä', 'ä', 'Ö', 'ö', 'Ü', 'ü', '/']
+       'u', 'v', 'w', 'x', 'y', 'z','å', 'Ä', 'ä', 'Ö', 'ö', 'Ü', 'ü', '/','<','>']
 image:
   - file: "fan_level_0.xbm"
     id: fan_level_0_icon
