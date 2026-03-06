@@ -349,7 +349,7 @@ display:
       } else if (id(current_program) == "cross_2") {
         it.print(90, 13, id(font_med), "Quer <-");
       } else if (id(current_program) == "efficient") {
-        it.print(90, 13, id(font_med), "Intervall");
+        it.print(90, 13, id(font_med), "Effizient");
       } else if (id(current_program) == "intensive") {
         it.print(75, 13, id(font_med), "Stoßlüftung");
       } else if (id(current_program) == "off") {
